@@ -22,7 +22,8 @@
                     android:id="@+id/photo"
                     android:layout_width="match_parent"
                     android:layout_height="@dimen/detail_photo_height"
-                    android:scaleType="centerCrop" />
+                    android:scaleType="centerCrop"
+                    android:transitionName="image" />
 
                 <View
                     android:layout_width="match_parent"
@@ -63,7 +64,6 @@
                         android:lineSpacingMultiplier="0.9"
                         android:paddingBottom="@dimen/detail_metabar_title_bottom_padding"
                         android:textColor="#fff"
-                        android:textSize="@dimen/detail_title_text_size"
                         android:textStyle="bold" />
 
                     <TextView
