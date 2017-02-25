@@ -7,11 +7,14 @@ import android.content.Loader;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.os.Bundle;
+import android.support.design.widget.AppBarLayout;
+import android.support.design.widget.CollapsingToolbarLayout;
 import android.support.v4.app.ShareCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.text.Html;
 import android.text.format.DateUtils;
+import android.text.method.LinkMovementMethod;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
@@ -41,7 +44,8 @@ public class ArticleDetailFragment extends Fragment implements
     private View mRootView;
 
     private ImageView mPhotoView;
-    private Toolbar mActionBarToolbar;
+    private AppBarLayout appBarLayout;
+    private CollapsingToolbarLayout collapsingToolbarLayout;
 
     /**
      * Mandatory empty constructor for the fragment manager to instantiate the
@@ -83,51 +87,82 @@ public class ArticleDetailFragment extends Fragment implements
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
+
+
         mRootView = inflater.inflate(R.layout.fragment_article_detail, container, false);
-        mActionBarToolbar = (Toolbar) mRootView.findViewById(R.id.toolbar);
-        ((AppCompatActivity) getActivity()).setSupportActionBar(mActionBarToolbar);
+
+
+        mPhotoView = (ImageView) mRootView.findViewById(R.id.photo);
+
+        collapsingToolbarLayout =
+                (CollapsingToolbarLayout) mRootView.findViewById(R.id.collapsing_toolbar);
+        appBarLayout = (AppBarLayout) mRootView.findViewById(R.id.appbar);
+
+        final Toolbar toolbar = (Toolbar) mRootView.findViewById(R.id.toolbar);
+        ((AppCompatActivity) getActivity()).setSupportActionBar(toolbar);
         ((AppCompatActivity) getActivity()).getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        mActionBarToolbar.setTitle("");
+        ((AppCompatActivity) getActivity()).getSupportActionBar().setDisplayShowTitleEnabled(false);
+        toolbar.setNavigationIcon(getResources().getDrawable(R.drawable.ic_arrow_back));
+        toolbar.setNavigationOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                getActivity().onBackPressed();
+            }
+        });
+
+
+        mRootView.findViewById(R.id.share_fab).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(Intent.createChooser(ShareCompat.IntentBuilder.from(getActivity())
+                        .setType("text/plain")
+                        .setText("Some sample text")
+                        .getIntent(), getString(R.string.action_share)));
+            }
+        });
 
         bindViews();
         return mRootView;
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case android.R.id.home:
-                getActivity().onBackPressed();
-                return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
 
     private void bindViews() {
-        if (mRootView == null) {
-            return;
-        }
-
-        mPhotoView = (ImageView) mRootView.findViewById(R.id.photo);
-
-
+        final TextView titleView = (TextView) mRootView.findViewById(R.id.article_title);
         TextView bylineView = (TextView) mRootView.findViewById(R.id.article_byline);
+        bylineView.setMovementMethod(new LinkMovementMethod());
         TextView bodyView = (TextView) mRootView.findViewById(R.id.article_body);
 
         if (mCursor != null) {
             mRootView.setAlpha(0);
             mRootView.setVisibility(View.VISIBLE);
             mRootView.animate().alpha(1);
-            mActionBarToolbar.setTitle(mCursor.getString(ArticleLoader.Query.TITLE));
+            appBarLayout.addOnOffsetChangedListener(new AppBarLayout.OnOffsetChangedListener() {
+                boolean isShow = false;
+                int scrollRange = -1;
 
-            bylineView.setText(
+                @Override
+                public void onOffsetChanged(AppBarLayout appBarLayout, int verticalOffset) {
+                    if (scrollRange == -1) {
+                        scrollRange = appBarLayout.getTotalScrollRange();
+                    }
+                    if (scrollRange + verticalOffset == 0) {
+                        collapsingToolbarLayout.setTitle(titleView.getText());
+                        isShow = true;
+                    } else if (isShow) {
+                        collapsingToolbarLayout.setTitle(" ");
+                        isShow = false;
+                    }
+                }
+            });
+            titleView.setText(mCursor.getString(ArticleLoader.Query.TITLE));
+            bylineView.setText(Html.fromHtml(
                     DateUtils.getRelativeTimeSpanString(
                             mCursor.getLong(ArticleLoader.Query.PUBLISHED_DATE),
                             System.currentTimeMillis(), DateUtils.HOUR_IN_MILLIS,
                             DateUtils.FORMAT_ABBREV_ALL).toString()
-                            + " by "
+                            + " by <font color='#ffffff'>"
                             + mCursor.getString(ArticleLoader.Query.AUTHOR)
-            );
+                            + "</font>"));
             bodyView.setText(Html.fromHtml(mCursor.getString(ArticleLoader.Query.BODY)));
             ImageLoaderHelper.getInstance(getActivity()).getImageLoader()
                     .get(mCursor.getString(ArticleLoader.Query.PHOTO_URL), new ImageLoader.ImageListener() {
@@ -141,21 +176,9 @@ public class ArticleDetailFragment extends Fragment implements
 
                         @Override
                         public void onErrorResponse(VolleyError volleyError) {
-
                         }
                     });
         }
-
-        mRootView.findViewById(R.id.share_fab).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                startActivity(Intent.createChooser(ShareCompat.IntentBuilder.from(getActivity())
-                        .setType("text/plain")
-                        .setText(mCursor.getString(ArticleLoader.Query.TITLE))
-                        .getIntent(), getString(R.string.action_share)));
-            }
-        });
-
     }
 
     @Override
@@ -178,7 +201,6 @@ public class ArticleDetailFragment extends Fragment implements
             mCursor.close();
             mCursor = null;
         }
-
         bindViews();
     }
 
@@ -187,4 +209,16 @@ public class ArticleDetailFragment extends Fragment implements
         mCursor = null;
         bindViews();
     }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        // handle arrow click here
+        if (item.getItemId() == android.R.id.home) {
+            getActivity().onBackPressed();
+            getActivity().finish(); // close this activity and return to preview activity (if there is any)
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
 }
